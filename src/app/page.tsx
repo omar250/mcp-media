@@ -12,11 +12,18 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
 
+  
   const loadKeys = async () => {
+  try {
     const res = await fetch("/api/keys");
+    if (!res.ok) return;
     const data = await res.json();
     setKeys(data.keys || []);
-  };
+  } catch (e) {
+    console.error(e);
+  }
+};
+
 
   useEffect(() => { loadKeys(); }, []);
 
