@@ -12,20 +12,20 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
 
-  
   const loadKeys = async () => {
-  try {
-    const res = await fetch("/api/keys");
-    if (!res.ok) return;
-    const data = await res.json();
-    setKeys(data.keys || []);
-  } catch (e) {
-    console.error(e);
-  }
-};
+    try {
+      const res = await fetch("/api/keys");
+      if (!res.ok) return;
+      const data = await res.json();
+      setKeys(data.keys || []);
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
-
-  useEffect(() => { loadKeys(); }, []);
+  useEffect(() => {
+    loadKeys();
+  }, []);
 
   const addKey = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,7 +55,9 @@ export default function Dashboard() {
       setResult({ success: false, error: err.message });
     }
     setLoading(false);
-      return (
+  };
+
+  return (
     <main style={{ maxWidth: "600px", margin: "0 auto", display: "grid", gap: "30px" }}>
       <section style={{ backgroundColor: "#1e293b", padding: "20px", borderRadius: "12px" }}>
         <h1 style={{ fontSize: "22px", marginTop: 0, marginBottom: "15px" }}>🎨 استوديو التوليد المباشر</h1>
@@ -100,4 +102,3 @@ export default function Dashboard() {
     </main>
   );
 }
-}  
