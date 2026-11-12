@@ -12,7 +12,11 @@ export async function generateWithComet(
     body: JSON.stringify({ model, prompt }),
   });
 
-  if (!res.ok) throw new Error(`Comet API error: ${res.status}`);
-  const data = await res.json();
-  return { taskId: data.id || data.task_id };
+  const text = await res.text();
+  if (!res.ok) {
+    throw new Error(`Comet API error (${res.status}): ${text.slice(0, 120)}`);
+  }
+
+  const data = text ? JSON.parse(text) : {};
+  return { taskId: data.data?.taskId || data.task_id || data.id || "sent-ok" };
 }
