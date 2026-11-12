@@ -1,19 +1,29 @@
 import { NextResponse } from "next/server";
-import { db, ensureSchema } from "@/lib/turso";
-
-export async function GET() {
-  await ensureSchema();
-  const res = await db.execute("SELECT id, provider, is_active, priority FROM api_keys ORDER BY priority ASC");
-  return NextResponse.json({ keys: res.rows });
-}
+import { resolveModel } from "@/lib/models";
+import { executeWithFallback } from "@/lib/coordinator";
+import { generateWithKie } from "@/lib/providers/kie";
+import { generateWithComet } from "@/lib/providers/comet";
 
 export async function POST(req: Request) {
-  await ensureSchema();
-  const { provider, api_key, priority = 0 } = await req.json();
-  const id = crypto.randomUUID();
-  await db.execute({
-    sql: "INSERT INTO api_keys (id, provider, api_key, is_active, priority, created_at) VALUES (?, ?, ?, 1, ?, ?)",
-    args: [id, provider, api_key, priority, new Date().toISOString()],
-  });
-  return NextResponse.json({ success: true, id });
+  try {
+    const body = await req.json();
+    const { model = "flux-pro", prompt } = body;
+    if (!prompt) {
+      return NextResponse.json({ success: false, error: "يرجى كتابة وصف المشهد أولاً" }, { status: 400 });
+    }
+
+    const config = resolveModel(model);
+    const result = await executeWithFallback(config.provider, (apiKey) =>
+      config.provider === "kie"
+        ? generateWithKie(apiKey, config.upstreamModel, prompt)
+        : generateWithComet(apiKey, config.upstreamModel, prompt)
+    );
+
+    return NextResponse.json({ success: true, ...result });
+  } catch (err: any) {
+    return NextResponse.json(
+      { success: false, error: err?.message || "حدث خطأ أثناء الاتصال بالمزود" },
+      { status: 500 }
+    );
+  }
 }
