@@ -12,7 +12,11 @@ export async function generateWithKie(
     body: JSON.stringify({ model, prompt }),
   });
 
-  if (!res.ok) throw new Error(`Kie API error: ${res.status}`);
-  const data = await res.json();
-  return { taskId: data.data?.taskId || data.taskId };
+  const text = await res.text();
+  if (!res.ok) {
+    throw new Error(`Kie API error (${res.status}): ${text.slice(0, 120)}`);
+  }
+
+  const data = text ? JSON.parse(text) : {};
+  return { taskId: data.data?.taskId || data.taskId || "sent-ok" };
 }
