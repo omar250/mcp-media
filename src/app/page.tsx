@@ -46,19 +46,18 @@ export default function Dashboard() {
 
     let finalPrompt = prompt.trim();
     try {
-      const tr = await fetch(
-        `https://translated.net{encodeURIComponent(finalPrompt)}&langpair=ar|en`
-      );
+      const trUrl = "https://translated.net" + encodeURIComponent(finalPrompt) + "&langpair=ar|en";
+      const tr = await fetch(trUrl);
       const trData = await tr.json();
       if (trData?.responseData?.translatedText) {
         finalPrompt = trData.responseData.translatedText;
       }
     } catch {}
 
-    const imageUrl = `https://pollinations.ai{encodeURIComponent(finalPrompt)}?model=${model}&width=1024&height=576&nologo=true&seed=${Date.now()}`;
+    const imageUrl = "https://pollinations.ai" + encodeURIComponent(finalPrompt) + "?model=" + model + "&width=1024&height=576&nologo=true&seed=" + Date.now();
     setResult({
       success: true,
-      message: `✅ جاري رسم الصورة (${finalPrompt})...`,
+      message: "✅ جاري رسم الصورة (" + finalPrompt + ")...",
       imageUrl,
     });
     setLoading(false);
