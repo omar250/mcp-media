@@ -1,29 +1,54 @@
 import { NextResponse } from "next/server";
-import { resolveModel } from "@/lib/models";
-import { executeWithFallback } from "@/lib/coordinator";
-import { generateWithKie } from "@/lib/providers/kie";
-import { generateWithComet } from "@/lib/providers/comet";
+import { db } from "@/lib/db";
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
-    const { model = "flux-pro", prompt } = body;
+    const { model = "flux-pro", prompt } = await req.json();
     if (!prompt) {
-      return NextResponse.json({ success: false, error: "يرجى كتابة وصف المشهد أولاً" }, { status: 400 });
+      return NextResponse.json({ success: false, error: "يرجى كتابة الوصف أولاً" }, { status: 400 });
     }
 
-    const config = resolveModel(model);
-    const result = await executeWithFallback(config.provider, (apiKey) =>
-      config.provider === "kie"
-        ? generateWithKie(apiKey, config.upstreamModel, prompt)
-        : generateWithComet(apiKey, config.upstreamModel, prompt)
-    );
+    const provider = model === "luma-dream" ? "comet" : "kie";
+    const result = await db.execute({
+      sql: "SELECT api_key FROM api_keys WHERE provider = ? AND is_active = 1 ORDER BY priority ASC LIMIT 1",
+      args: [provider],
+    });
 
-    return NextResponse.json({ success: true, ...result });
+    const apiKey = result.rows[0]?.api_key as string;
+    if (!apiKey) {
+      return NextResponse.json({ success: false, error: `لا يوجد مفتاح نشط للمزود: ${provider}` }, { status: 404 });
+    }
+
+    if (provider === "kie") {
+      const res = await fetch("https://kie.ai", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: model === "kling-video" ? "kling/v2-1-master-text-to-video" : "flux-kontext-pro",
+          input: { prompt },
+        }),
+      });
+      const text = await res.text();
+      return NextResponse.json({ success: res.ok, taskId: text, error: res.ok ? null : text });
+    } else {
+      const res = await fetch("https://cometapi.com", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: "gpt-4o-mini",
+          messages: [{ role: "user", content: prompt }],
+        }),
+      });
+      const text = await res.text();
+      return NextResponse.json({ success: res.ok, taskId: text, error: res.ok ? null : text });
+    }
   } catch (err: any) {
-    return NextResponse.json(
-      { success: false, error: err?.message || "حدث خطأ أثناء الاتصال بالمزود" },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
 }
