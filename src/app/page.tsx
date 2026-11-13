@@ -5,12 +5,11 @@ export default function Dashboard() {
   const [keys, setKeys] = useState<any[]>([]);
   const [provider, setProvider] = useState("kie");
   const [apiKey, setApiKey] = useState("");
-  const [priority, setPriority] = useState(1);
+  const [priority, setPriority] = useState(0);
 
-  const [model, setModel] = useState("kling-video");
+  const [model, setModel] = useState("flux-pro");
   const [prompt, setPrompt] = useState("");
   const [loading, setLoading] = useState(false);
-  const [checking, setChecking] = useState(false);
   const [result, setResult] = useState<any>(null);
 
   const loadKeys = async () => {
@@ -69,9 +68,7 @@ export default function Dashboard() {
         setResult({
           success: true,
           message: textReply,
-          taskId: data.result?.taskId || null,
-          provider: data.result?.provider || "kie",
-          mediaUrl: null,
+          imageUrl: data.result?.imageUrl || null,
         });
       }
     } catch (err: any) {
@@ -80,42 +77,17 @@ export default function Dashboard() {
     setLoading(false);
   };
 
-  const checkStatus = async () => {
-    if (!result?.taskId) return;
-    setChecking(true);
-    try {
-      const res = await fetch("/api/status", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ taskId: result.taskId, provider: result.provider }),
-      });
-      const data = await res.json();
-      if (!data.success) {
-        alert(data.error);
-      } else if (data.mediaUrl) {
-        setResult({ ...result, mediaUrl: data.mediaUrl, message: "✅ الفيديو جاهز!" });
-      } else {
-        alert(`حالة الفيديو الحالية: ${data.state} (انتظر 20 ثانية واضغط فحص مرة أخرى)`);
-      }
-    } catch (err: any) {
-      alert(err.message);
-    }
-    setChecking(false);
-  };
-
   return (
     <main style={{ maxWidth: "600px", margin: "0 auto", display: "grid", gap: "30px" }}>
       <section style={{ backgroundColor: "#1e293b", padding: "20px", borderRadius: "12px" }}>
-        <h1 style={{ fontSize: "22px", marginTop: 0, marginBottom: "15px" }}>🎬 استوديو التوليد واستخراج الفيديو</h1>
+        <h1 style={{ fontSize: "22px", marginTop: 0, marginBottom: "15px" }}>🎨 استوديو التوليد المجاني (Flux)</h1>
         <form onSubmit={generateMedia} style={{ display: "grid", gap: "12px" }}>
           <select value={model} onChange={(e) => setModel(e.target.value)} style={{ padding: "12px", borderRadius: "8px", color: "#000" }}>
-            <option value="kling-video">فيديو - Kling AI (Kie.ai)</option>
-            <option value="flux-pro">صورة - Flux Pro (Kie.ai)</option>
-            <option value="luma-dream">فيديو - Luma Dream (CometAPI)</option>
+            <option value="flux-pro">صورة - FLUX.1 Schnell (مجاني)</option>
           </select>
-          <textarea rows={3} placeholder="اكتب وصف الفيديو أو الصورة هنا..." value={prompt} onChange={(e) => setPrompt(e.target.value)} style={{ padding: "12px", borderRadius: "8px", color: "#000" }} />
+          <textarea rows={3} placeholder="اكتب وصف الصورة (يفضل بالإنجليزية لأفضل نتيجة مثل: a man running in a futuristic city)..." value={prompt} onChange={(e) => setPrompt(e.target.value)} style={{ padding: "12px", borderRadius: "8px", color: "#000" }} />
           <button type="submit" disabled={loading} style={{ padding: "12px", backgroundColor: "#10b981", color: "#fff", fontWeight: "bold", border: "none", borderRadius: "8px", cursor: "pointer" }}>
-            {loading ? "جاري الإرسال..." : "توليد الآن 🚀"}
+            {loading ? "جاري توليد الصورة..." : "توليد الصورة الآن 🚀"}
           </button>
         </form>
 
@@ -124,16 +96,11 @@ export default function Dashboard() {
             {result.success ? (
               <div style={{ display: "grid", gap: "10px" }}>
                 <p style={{ margin: 0, color: "#4ade80" }}>{result.message}</p>
-                {result.taskId && !result.mediaUrl && (
-                  <button onClick={checkStatus} disabled={checking} style={{ padding: "10px", backgroundColor: "#f59e0b", color: "#000", fontWeight: "bold", border: "none", borderRadius: "8px", cursor: "pointer" }}>
-                    {checking ? "جاري الفحص..." : "🔄 فحص واستخراج الفيديو الآن"}
-                  </button>
-                )}
-                {result.mediaUrl && (
+                {result.imageUrl && (
                   <div>
-                    <video src={result.mediaUrl} controls autoPlay loop style={{ width: "100%", borderRadius: "8px" }} />
-                    <a href={result.mediaUrl} target="_blank" download style={{ display: "block", marginTop: "10px", padding: "10px", backgroundColor: "#3b82f6", color: "#fff", textAlign: "center", borderRadius: "8px", textDecoration: "none", fontWeight: "bold" }}>
-                      ⬇️ تحميل الفيديو MP4
+                    <img src={result.imageUrl} alt={prompt} style={{ width: "100%", borderRadius: "8px" }} />
+                    <a href={result.imageUrl} download="generated-image.jpg" style={{ display: "block", marginTop: "10px", padding: "10px", backgroundColor: "#3b82f6", color: "#fff", textAlign: "center", borderRadius: "8px", textDecoration: "none", fontWeight: "bold" }}>
+                      ⬇️ حفظ الصورة على الهاتف
                     </a>
                   </div>
                 )}
@@ -149,10 +116,10 @@ export default function Dashboard() {
         <h2 style={{ fontSize: "20px", marginTop: 0, marginBottom: "15px" }}>🔑 إدارة مفاتيح API</h2>
         <form onSubmit={addKey} style={{ display: "flex", gap: "10px", marginBottom: "20px", flexWrap: "wrap" }}>
           <select value={provider} onChange={(e) => setProvider(e.target.value)} style={{ padding: "10px", borderRadius: "8px", color: "#000" }}>
-            <option value="kie">Kie.ai</option>
+            <option value="kie">Hugging Face / Kie</option>
             <option value="comet">CometAPI</option>
           </select>
-          <input type="text" placeholder="أدخل مفتاح API هنا" value={apiKey} onChange={(e) => setApiKey(e.target.value)} style={{ flex: 1, padding: "10px", borderRadius: "8px", color: "#000" }} />
+          <input type="text" placeholder="أدخل مفتاح hf_ هنا" value={apiKey} onChange={(e) => setApiKey(e.target.value)} style={{ flex: 1, padding: "10px", borderRadius: "8px", color: "#000" }} />
           <input type="number" value={priority} onChange={(e) => setPriority(Number(e.target.value))} style={{ width: "60px", padding: "10px", borderRadius: "8px", color: "#000" }} />
           <button type="submit" style={{ padding: "10px 20px", backgroundColor: "#3b82f6", color: "#fff", border: "none", borderRadius: "8px", cursor: "pointer" }}>إضافة</button>
         </form>
