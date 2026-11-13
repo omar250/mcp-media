@@ -9,14 +9,24 @@ export async function generateWithKie(
       "Content-Type": "application/json",
       Authorization: `Bearer ${apiKey}`,
     },
-    body: JSON.stringify({ model, prompt }),
+    body: JSON.stringify({
+      model,
+      input: { prompt },
+    }),
   });
 
   const text = await res.text();
   if (!res.ok) {
-    throw new Error(`Kie API error (${res.status}): ${text.slice(0, 120)}`);
+    throw new Error(`Kie API (${res.status}): ${text.slice(0, 120)}`);
   }
 
-  const data = text ? JSON.parse(text) : {};
-  return { taskId: data.data?.taskId || data.taskId || "sent-ok" };
+  try {
+    const data = JSON.parse(text);
+    if (data.code && data.code !== 200) {
+      throw new Error(`Kie error (${data.code}): ${data.msg || text.slice(0, 100)}`);
+    }
+    return { taskId: data.data?.taskId || data.taskId || "sent-ok" };
+  } catch (e: any) {
+    throw new Error(e.message || `استجابة غير صالحة من Kie: ${text.slice(0, 80)}`);
+  }
 }
