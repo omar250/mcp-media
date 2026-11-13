@@ -46,23 +46,28 @@ export default function Dashboard() {
     setResult(null);
 
     try {
-      if (model === "flux-pro") {
-        const imageUrl = `https://pollinations.ai{encodeURIComponent(prompt)}?width=1024&height=576&nologo=true&seed=${Date.now()}`;
-        setResult({ success: true, taskId: imageUrl, isImage: true });
-        setLoading(false);
-        return;
-      }
-
       const res = await fetch("/mcp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ model, prompt }),
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "tools/call",
+          params: {
+            name: "generate_media",
+            arguments: { model, prompt },
+          },
+        }),
       });
-      const text = await res.text();
-      try {
-        setResult(JSON.parse(text));
-      } catch {
-        setResult({ success: false, error: `استجابة الخادم (${res.status}): ${text.slice(0, 120)}` });
+
+      const data = await res.json();
+      const textReply = data.result?.content?.[0]?.text;
+      const isErr = data.result?.isError || data.error;
+
+      if (isErr) {
+        setResult({ success: false, error: textReply || data.error?.message || "حدث خطأ" });
+      } else {
+        setResult({ success: true, taskId: textReply || "تم التنفيذ عبر خادم MCP" });
       }
     } catch (err: any) {
       setResult({ success: false, error: err.message });
@@ -73,32 +78,21 @@ export default function Dashboard() {
   return (
     <main style={{ maxWidth: "600px", margin: "0 auto", display: "grid", gap: "30px" }}>
       <section style={{ backgroundColor: "#1e293b", padding: "20px", borderRadius: "12px" }}>
-        <h1 style={{ fontSize: "22px", marginTop: 0, marginBottom: "15px" }}>🎨 استوديو التوليد المباشر</h1>
+        <h1 style={{ fontSize: "22px", marginTop: 0, marginBottom: "15px" }}>🎨 اختبار خادم MCP المباشر</h1>
         <form onSubmit={generateMedia} style={{ display: "grid", gap: "12px" }}>
           <select value={model} onChange={(e) => setModel(e.target.value)} style={{ padding: "12px", borderRadius: "8px", color: "#000" }}>
-            <option value="flux-pro">صورة - Flux Pro (عرض مباشر)</option>
+            <option value="flux-pro">صورة - Flux Pro (Kie.ai)</option>
             <option value="kling-video">فيديو - Kling AI (Kie.ai)</option>
             <option value="luma-dream">فيديو - Luma Dream (CometAPI)</option>
           </select>
-          <textarea rows={3} placeholder="اكتب وصف الصورة أو الفيديو هنا..." value={prompt} onChange={(e) => setPrompt(e.target.value)} style={{ padding: "12px", borderRadius: "8px", color: "#000" }} />
+          <textarea rows={3} placeholder="اكتب وصف المشهد هنا..." value={prompt} onChange={(e) => setPrompt(e.target.value)} style={{ padding: "12px", borderRadius: "8px", color: "#000" }} />
           <button type="submit" disabled={loading} style={{ padding: "12px", backgroundColor: "#10b981", color: "#fff", fontWeight: "bold", border: "none", borderRadius: "8px", cursor: "pointer" }}>
-            {loading ? "جاري التوليد..." : "توليد الآن 🚀"}
+            {loading ? "جاري الاتصال بخادم MCP..." : "إرسال أمر MCP 🚀"}
           </button>
         </form>
         {result && (
           <div style={{ marginTop: "15px", padding: "12px", backgroundColor: "#0f172a", borderRadius: "8px", fontSize: "14px", wordBreak: "break-all" }}>
-            {result.success ? (
-              result.isImage ? (
-                <div>
-                  <p style={{ margin: "0 0 10px 0", color: "#4ade80" }}>✅ تم توليد الصورة بنجاح:</p>
-                  <img src={result.taskId} alt={prompt} style={{ width: "100%", borderRadius: "8px" }} />
-                </div>
-              ) : (
-                `✅ النتيجة: ${result.taskId}`
-              )
-            ) : (
-              `❌ خطأ: ${result.error}`
-            )}
+            {result.success ? `✅ ${result.taskId}` : `❌ خطأ: ${result.error}`}
           </div>
         )}
       </section>
