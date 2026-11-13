@@ -50,7 +50,15 @@ export default function Dashboard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ model, prompt }),
       });
-      setResult(await res.json());
+      const text = await res.text();
+      try {
+        setResult(JSON.parse(text));
+      } catch {
+        setResult({
+          success: false,
+          error: `استجابة الخادم (${res.status}): ${text.slice(0, 120)}`,
+        });
+      }
     } catch (err: any) {
       setResult({ success: false, error: err.message });
     }
@@ -74,7 +82,7 @@ export default function Dashboard() {
         </form>
         {result && (
           <div style={{ marginTop: "15px", padding: "12px", backgroundColor: "#0f172a", borderRadius: "8px", fontSize: "14px", wordBreak: "break-all" }}>
-            {result.success ? `✅ تم إرسال الطلب بنجاح! رقم المهمة: ${result.taskId}` : `❌ خطأ: ${result.error}`}
+            {result.success ? `✅ النتيجة: ${result.taskId}` : `❌ خطأ: ${result.error}`}
           </div>
         )}
       </section>
