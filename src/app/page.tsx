@@ -46,31 +46,41 @@ export default function Dashboard() {
     setResult(null);
 
     try {
-      const res = await fetch("/mcp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          jsonrpc: "2.0",
-          id: 1,
-          method: "tools/call",
-          params: { name: "generate_media", arguments: { model, prompt } },
-        }),
-      });
+      const keyRes = await fetch("/api/active-key", { method: "POST" });
+      const { apiKey: hfKey } = await keyRes.json();
 
-      const data = await res.json();
-      const firstContent = Array.isArray(data.result?.content) ? data.result.content.at(0) : null;
-      const textReply = firstContent?.text;
-      const isErr = data.result?.isError || data.error;
-
-      if (isErr) {
-        setResult({ success: false, error: textReply || data.error?.message || "حدث خطأ" });
-      } else {
-        setResult({
-          success: true,
-          message: textReply,
-          imageUrl: data.result?.imageUrl || null,
-        });
+      if (!hfKey) {
+        setResult({ success: false, error: "يرجى إضافة مفتاح Hugging Face (hf_) في الأسفل أولاً." });
+        setLoading(false);
+        return;
       }
+
+      const res = await fetch(
+        "https://huggingface.co",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${hfKey.trim()}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ inputs: prompt }),
+        }
+      );
+
+      if (!res.ok) {
+        const errText = await res.text();
+        setResult({ success: false, error: `Hugging Face (${res.status}): ${errText.slice(0, 120)}` });
+        setLoading(false);
+        return;
+      }
+
+      const blob = await res.blob();
+      const imageUrl = URL.createObjectURL(blob);
+      setResult({
+        success: true,
+        message: "✅ تم توليد الصورة بنجاح مجاناً!",
+        imageUrl,
+      });
     } catch (err: any) {
       setResult({ success: false, error: err.message });
     }
@@ -80,12 +90,12 @@ export default function Dashboard() {
   return (
     <main style={{ maxWidth: "600px", margin: "0 auto", display: "grid", gap: "30px" }}>
       <section style={{ backgroundColor: "#1e293b", padding: "20px", borderRadius: "12px" }}>
-        <h1 style={{ fontSize: "22px", marginTop: 0, marginBottom: "15px" }}>🎨 استوديو التوليد المجاني (Flux)</h1>
+        <h1 style={{ fontSize: "22px", marginTop: 0, marginBottom: "15px" }}>🎨 استوديو التوليد المجاني</h1>
         <form onSubmit={generateMedia} style={{ display: "grid", gap: "12px" }}>
           <select value={model} onChange={(e) => setModel(e.target.value)} style={{ padding: "12px", borderRadius: "8px", color: "#000" }}>
-            <option value="flux-pro">صورة - FLUX.1 Schnell (مجاني)</option>
+            <option value="flux-pro">صورة - Stable Diffusion XL (مجاني)</option>
           </select>
-          <textarea rows={3} placeholder="اكتب وصف الصورة (يفضل بالإنجليزية لأفضل نتيجة مثل: a man running in a futuristic city)..." value={prompt} onChange={(e) => setPrompt(e.target.value)} style={{ padding: "12px", borderRadius: "8px", color: "#000" }} />
+          <textarea rows={3} placeholder="اكتب وصف الصورة بالإنجليزية لأفضل نتيجة (مثل: a man walking in a sunny park)..." value={prompt} onChange={(e) => setPrompt(e.target.value)} style={{ padding: "12px", borderRadius: "8px", color: "#000" }} />
           <button type="submit" disabled={loading} style={{ padding: "12px", backgroundColor: "#10b981", color: "#fff", fontWeight: "bold", border: "none", borderRadius: "8px", cursor: "pointer" }}>
             {loading ? "جاري توليد الصورة..." : "توليد الصورة الآن 🚀"}
           </button>
@@ -99,7 +109,7 @@ export default function Dashboard() {
                 {result.imageUrl && (
                   <div>
                     <img src={result.imageUrl} alt={prompt} style={{ width: "100%", borderRadius: "8px" }} />
-                    <a href={result.imageUrl} download="generated-image.jpg" style={{ display: "block", marginTop: "10px", padding: "10px", backgroundColor: "#3b82f6", color: "#fff", textAlign: "center", borderRadius: "8px", textDecoration: "none", fontWeight: "bold" }}>
+                    <a href={result.imageUrl} download="ai-image.jpg" style={{ display: "block", marginTop: "10px", padding: "10px", backgroundColor: "#3b82f6", color: "#fff", textAlign: "center", borderRadius: "8px", textDecoration: "none", fontWeight: "bold" }}>
                       ⬇️ حفظ الصورة على الهاتف
                     </a>
                   </div>
@@ -116,7 +126,7 @@ export default function Dashboard() {
         <h2 style={{ fontSize: "20px", marginTop: 0, marginBottom: "15px" }}>🔑 إدارة مفاتيح API</h2>
         <form onSubmit={addKey} style={{ display: "flex", gap: "10px", marginBottom: "20px", flexWrap: "wrap" }}>
           <select value={provider} onChange={(e) => setProvider(e.target.value)} style={{ padding: "10px", borderRadius: "8px", color: "#000" }}>
-            <option value="kie">Hugging Face / Kie</option>
+            <option value="kie">Hugging Face</option>
             <option value="comet">CometAPI</option>
           </select>
           <input type="text" placeholder="أدخل مفتاح hf_ هنا" value={apiKey} onChange={(e) => setApiKey(e.target.value)} style={{ flex: 1, padding: "10px", borderRadius: "8px", color: "#000" }} />
