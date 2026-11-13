@@ -9,18 +9,22 @@ export async function generateWithComet(
       "Content-Type": "application/json",
       Authorization: `Bearer ${apiKey}`,
     },
-    body: JSON.stringify({ model, prompt }),
+    body: JSON.stringify({
+      model,
+      messages: [{ role: "user", content: prompt }],
+    }),
   });
 
   const text = await res.text();
   if (!res.ok) {
-    throw new Error(`Comet API (${res.status}): ${text.slice(0, 100)}`);
+    throw new Error(`Comet API (${res.status}): ${text.slice(0, 120)}`);
   }
 
   try {
     const data = JSON.parse(text);
-    return { taskId: data.data?.[0]?.url || data.taskId || data.id || "sent-ok" };
+    const reply = data.choices?.[0]?.message?.content;
+    return { taskId: reply || data.id || "sent-ok" };
   } catch {
-    throw new Error("أعاد خادم CometAPI صفحة HTML بدلاً من JSON؛ تحقق من رابط API الخاص به.");
+    throw new Error(`استجابة غير متوقعة من CometAPI: ${text.slice(0, 80)}`);
   }
 }
