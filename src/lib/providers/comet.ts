@@ -10,21 +10,21 @@ export async function generateWithComet(
       Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model,
-      messages: [{ role: "user", content: prompt }],
+      model: "flux-schnell",
+      prompt,
     }),
   });
 
   const text = await res.text();
   if (!res.ok) {
-    throw new Error(`Comet API (${res.status}): ${text.slice(0, 120)}`);
+    throw new Error(`Comet API (${res.status}): ${text.slice(0, 150)}`);
   }
 
   try {
     const data = JSON.parse(text);
-    const reply = data.choices?.[0]?.message?.content;
-    return { taskId: reply || data.id || "sent-ok" };
+    const url = data.data?.[0]?.url || data.url || data.id;
+    return { taskId: url || "تم الإرسال بنجاح" };
   } catch {
-    throw new Error(`استجابة غير متوقعة من CometAPI: ${text.slice(0, 80)}`);
+    throw new Error(`رد غير متوقع (${res.status}): ${text.slice(0, 100)}`);
   }
 }
