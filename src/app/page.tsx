@@ -44,53 +44,25 @@ export default function Dashboard() {
     if (!prompt) return;
     setLoading(true);
     setResult(null);
-    try {
-      const targetProvider = model === "luma-dream" ? "comet" : "kie";
-      const keyRes = await fetch("/api/active-key", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ provider: targetProvider }),
-      });
-      const { apiKey: activeKey } = await keyRes.json();
 
-      if (!activeKey) {
-        setResult({ success: false, error: `لا يوجد مفتاح نشط للمزود: ${targetProvider}` });
+    try {
+      if (model === "flux-pro") {
+        const imageUrl = `https://pollinations.ai{encodeURIComponent(prompt)}?width=1024&height=576&nologo=true&seed=${Date.now()}`;
+        setResult({ success: true, taskId: imageUrl, isImage: true });
         setLoading(false);
         return;
       }
 
-      if (targetProvider === "kie") {
-        const endpoint = model === "kling-video"
-          ? "https://kie.ai"
-          : "https://kie.ai";
-        const payload = model === "kling-video"
-          ? { model: "kling-3.0/video", input: { prompt, aspect_ratio: "16:9", duration: "5" } }
-          : { prompt, aspectRatio: "16:9", model: "flux-kontext-pro" };
-
-        const res = await fetch(endpoint, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${activeKey.trim()}`,
-          },
-          body: JSON.stringify(payload),
-        });
-        const text = await res.text();
-        setResult({ success: res.ok, taskId: text, error: res.ok ? null : text });
-      } else {
-        const res = await fetch("https://cometapi.com", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${activeKey.trim()}`,
-          },
-          body: JSON.stringify({
-            model: "gpt-4o",
-            messages: [{ role: "user", content: prompt }],
-          }),
-        });
-        const text = await res.text();
-        setResult({ success: res.ok, taskId: text, error: res.ok ? null : text });
+      const res = await fetch("/mcp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ model, prompt }),
+      });
+      const text = await res.text();
+      try {
+        setResult(JSON.parse(text));
+      } catch {
+        setResult({ success: false, error: `استجابة الخادم (${res.status}): ${text.slice(0, 120)}` });
       }
     } catch (err: any) {
       setResult({ success: false, error: err.message });
@@ -104,18 +76,29 @@ export default function Dashboard() {
         <h1 style={{ fontSize: "22px", marginTop: 0, marginBottom: "15px" }}>🎨 استوديو التوليد المباشر</h1>
         <form onSubmit={generateMedia} style={{ display: "grid", gap: "12px" }}>
           <select value={model} onChange={(e) => setModel(e.target.value)} style={{ padding: "12px", borderRadius: "8px", color: "#000" }}>
-            <option value="flux-pro">صورة - Flux Pro (Kie.ai)</option>
+            <option value="flux-pro">صورة - Flux Pro (عرض مباشر)</option>
             <option value="kling-video">فيديو - Kling AI (Kie.ai)</option>
             <option value="luma-dream">فيديو - Luma Dream (CometAPI)</option>
           </select>
           <textarea rows={3} placeholder="اكتب وصف الصورة أو الفيديو هنا..." value={prompt} onChange={(e) => setPrompt(e.target.value)} style={{ padding: "12px", borderRadius: "8px", color: "#000" }} />
           <button type="submit" disabled={loading} style={{ padding: "12px", backgroundColor: "#10b981", color: "#fff", fontWeight: "bold", border: "none", borderRadius: "8px", cursor: "pointer" }}>
-            {loading ? "جاري الإرسال والتوليد..." : "توليد الآن 🚀"}
+            {loading ? "جاري التوليد..." : "توليد الآن 🚀"}
           </button>
         </form>
         {result && (
           <div style={{ marginTop: "15px", padding: "12px", backgroundColor: "#0f172a", borderRadius: "8px", fontSize: "14px", wordBreak: "break-all" }}>
-            {result.success ? `✅ النتيجة: ${result.taskId}` : `❌ خطأ: ${result.error}`}
+            {result.success ? (
+              result.isImage ? (
+                <div>
+                  <p style={{ margin: "0 0 10px 0", color: "#4ade80" }}>✅ تم توليد الصورة بنجاح:</p>
+                  <img src={result.taskId} alt={prompt} style={{ width: "100%", borderRadius: "8px" }} />
+                </div>
+              ) : (
+                `✅ النتيجة: ${result.taskId}`
+              )
+            ) : (
+              `❌ خطأ: ${result.error}`
+            )}
           </div>
         )}
       </section>
