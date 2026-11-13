@@ -23,24 +23,28 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: "لا يوجد مفتاح نشط" }, { status: 404 });
     }
 
-    // الاستعلام عن حالة المهمة من Kie.ai
-    const res = await fetch(`https://kie.ai{encodeURIComponent(taskId)}`, {
-      method: "GET",
-      headers: {
-        "Authorization": `Bearer ${apiKey}`,
-      },
-    });
+    const res = await fetch(
+      `https://kie.ai{encodeURIComponent(taskId)}`,
+      {
+        method: "GET",
+        headers: { Authorization: `Bearer ${apiKey}` },
+      }
+    );
 
-    const data = await res.json();
-    const state = data.data?.state; // waiting, queuing, generating, success, fail
-    const resultJson = data.data?.resultJson ? JSON.parse(data.data.resultJson) : null;
-    const videoUrl = resultJson?.resultUrls?. || null;
+    const text = await res.text();
+    if (text.trim().startsWith("<")) {
+      return NextResponse.json({ success: false, error: "الخادم أعاد صفحة ويب؛ تأكد من رصيد وصلاحية المفتاح." });
+    }
+
+    const data = JSON.parse(text);
+    const state = data.data?.state || "processing";
+    const parsedResult = data.data?.resultJson ? JSON.parse(data.data.resultJson) : null;
+    const mediaUrl = Array.isArray(parsedResult?.resultUrls) ? parsedResult.resultUrls.at(0) : null;
 
     return NextResponse.json({
       success: true,
       state,
-      videoUrl,
-      raw: data,
+      mediaUrl,
     });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
