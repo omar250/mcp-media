@@ -14,7 +14,8 @@ export async function POST(req: Request) {
       args: [provider],
     });
 
-    const apiKey = result.rows?.[0]?.api_key as string;
+    const firstRow = result.rows.at(0) as any;
+    const apiKey = firstRow?.api_key as string;
     if (!apiKey) {
       return NextResponse.json({ success: false, error: `لا يوجد مفتاح نشط للمزود: ${provider}` }, { status: 404 });
     }
