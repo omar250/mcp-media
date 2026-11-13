@@ -26,24 +26,36 @@ export async function POST(req: Request) {
     }
 
     if (provider === "kie") {
-      const res = await fetch("https://kie.ai", {
+      // مسار Flux الرسمي في Kie.ai أو مسار المهام العام
+      const endpoint = model === "kling-video"
+        ? "https://kie.ai"
+        : "https://kie.ai";
+
+      const payload = model === "kling-video"
+        ? { model: "kling/v2-1-master-text-to-video", input: { prompt } }
+        : { prompt, aspectRatio: "16:9", model: "flux-kontext-pro" };
+
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "Accept": "application/json",
           "Authorization": `Bearer ${apiKey}`,
         },
-        body: JSON.stringify({
-          model: model === "kling-video" ? "kling/v2-1-master-text-to-video" : "flux-kontext-pro",
-          input: { prompt },
-        }),
+        body: JSON.stringify(payload),
       });
+
       const text = await res.text();
+      if (text.trim().startsWith("<")) {
+        return NextResponse.json({ success: false, error: "خادم Kie.ai أعاد صفحة ويب؛ تأكد من صحة رابط API في حسابك." });
+      }
       return NextResponse.json({ success: res.ok, taskId: text, error: res.ok ? null : text });
     } else {
       const res = await fetch("https://cometapi.com", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "Accept": "application/json",
           "Authorization": `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
@@ -51,7 +63,11 @@ export async function POST(req: Request) {
           messages: [{ role: "user", content: prompt }],
         }),
       });
+
       const text = await res.text();
+      if (text.trim().startsWith("<")) {
+        return NextResponse.json({ success: false, error: "خادم CometAPI أعاد صفحة ويب؛ تأكد من تفعيل المفتاح والرصيد في حسابك." });
+      }
       return NextResponse.json({ success: res.ok, taskId: text, error: res.ok ? null : text });
     }
   } catch (err: any) {
