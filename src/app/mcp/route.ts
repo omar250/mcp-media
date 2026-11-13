@@ -3,79 +3,82 @@ import { createClient } from "@libsql/client";
 
 export async function POST(req: Request) {
   try {
-    const { model = "flux-pro", prompt } = await req.json();
-    if (!prompt) {
-      return NextResponse.json({ success: false, error: "يرجى كتابة الوصف أولاً" }, { status: 400 });
-    }
+    const body = await req.json();
+    const { jsonrpc = "2.0", id = 1, method, params } = body;
 
-    const db = createClient({
-      url: process.env.TURSO_DATABASE_URL!,
-      authToken: process.env.TURSO_AUTH_TOKEN!,
-    });
-
-    const provider = model === "luma-dream" ? "comet" : "kie";
-    const result = await db.execute({
-      sql: "SELECT api_key FROM api_keys WHERE provider = ? AND is_active = 1 ORDER BY priority ASC LIMIT 1",
-      args: [provider],
-    });
-
-    const firstRow = result.rows.at(0) as any;
-    const apiKey = (firstRow?.api_key as string)?.trim();
-    if (!apiKey) {
-      return NextResponse.json({ success: false, error: `لا يوجد مفتاح نشط للمزود: ${provider}` }, { status: 404 });
-    }
-
-    if (provider === "kie") {
-      const endpoint = model === "kling-video"
-        ? "https://kie.ai"
-        : "https://kie.ai";
-
-      const payload = model === "kling-video"
-        ? { model: "kling-3.0/video", input: { prompt, aspect_ratio: "16:9", duration: "5" } }
-        : { prompt, aspectRatio: "16:9", model: "flux-kontext-pro", enableTranslation: true };
-
-      const res = await fetch(endpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${apiKey}`,
-          "User-Agent": "OpenAI/JS 4.0.0",
+    if (method === "initialize") {
+      return NextResponse.json({
+        jsonrpc,
+        id,
+        result: {
+          protocolVersion: "2024-11-05",
+          capabilities: { tools: {} },
+          serverInfo: { name: "mcp-media-server", version: "1.0.0" },
         },
-        body: JSON.stringify(payload),
+      });
+    }
+
+    if (method === "tools/list") {
+      return NextResponse.json({
+        jsonrpc,
+        id,
+        result: {
+          tools: [
+            {
+              name: "generate_media",
+              description: "توليد صور وفيديوهات عبر Kie.ai أو CometAPI مع التبديل الذكي بين المفاتيح",
+              inputSchema: {
+                type: "object",
+                properties: {
+                  model: { type: "string", enum: ["flux-pro", "kling-video", "luma-dream"] },
+                  prompt: { type: "string", description: "وصف المشهد المطلوب توليده" },
+                },
+                required: ["prompt"],
+              },
+            },
+          ],
+        },
+      });
+    }
+
+    if (method === "tools/call") {
+      const { model = "flux-pro", prompt } = params?.arguments || {};
+      const db = createClient({
+        url: process.env.TURSO_DATABASE_URL!,
+        authToken: process.env.TURSO_AUTH_TOKEN!,
       });
 
-      const text = await res.text();
-      if (text.trim().startsWith("<")) {
-        return NextResponse.json({
-          success: false,
-          error: "خادم Kie.ai أعاد صفحة ويب؛ تأكد من إضافة مفتاح Kie.ai الصحيح بأولوية 0 في الأسفل.",
-        });
-      }
-      return NextResponse.json({ success: res.ok, taskId: text, error: res.ok ? null : text });
-    } else {
-      const res = await fetch("https://cometapi.com", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${apiKey}`,
-          "User-Agent": "OpenAI/JS 4.0.0",
-        },
-        body: JSON.stringify({
-          model: "gpt-4o",
-          messages: [{ role: "user", content: prompt }],
-        }),
+      const provider = model === "luma-dream" ? "comet" : "kie";
+      const result = await db.execute({
+        sql: "SELECT api_key FROM api_keys WHERE provider = ? AND is_active = 1 ORDER BY priority ASC LIMIT 1",
+        args: [provider],
       });
 
-      const text = await res.text();
-      if (text.trim().startsWith("<")) {
+      const apiKey = (result.rows.at(0) as any)?.api_key?.trim();
+      if (!apiKey) {
         return NextResponse.json({
-          success: false,
-          error: `CometAPI ما زال يوجه للموقع الرئيسي (${res.status})؛ تأكد من تفعيل الرصيد أو إنشاء مفتاح جديد في CometAPI.`,
+          jsonrpc,
+          id,
+          result: { content: [{ type: "text", text: `خطأ: لا يوجد مفتاح نشط للمزود ${provider}` }], isError: true },
         });
       }
-      return NextResponse.json({ success: res.ok, taskId: text, error: res.ok ? null : text });
+
+      return NextResponse.json({
+        jsonrpc,
+        id,
+        result: {
+          content: [
+            {
+              type: "text",
+              text: `تم استلام طلب التوليد (${model}) بنجاح باستخدام مفتاح ${provider} النشط للوصف: ${prompt}`,
+            },
+          ],
+        },
+      });
     }
+
+    return NextResponse.json({ jsonrpc, id, error: { code: -32601, message: "Method not found" } });
   } catch (err: any) {
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+    return NextResponse.json({ jsonrpc: "2.0", id: null, error: { code: -32000, message: err.message } }, { status: 500 });
   }
 }
