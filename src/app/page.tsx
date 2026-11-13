@@ -30,13 +30,15 @@ export default function Dashboard() {
   const addKey = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!apiKey) return;
+    localStorage.setItem("hf_token", apiKey.trim());
     await fetch("/api/keys", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ provider, api_key: apiKey, priority }),
+      body: JSON.stringify({ provider, api_key: apiKey.trim(), priority }),
     });
     setApiKey("");
     loadKeys();
+    alert("✅ تم حفظ المفتاح بنجاح!");
   };
 
   const generateMedia = async (e: React.FormEvent) => {
@@ -46,11 +48,15 @@ export default function Dashboard() {
     setResult(null);
 
     try {
-      const keyRes = await fetch("/api/active-key", { method: "POST" });
-      const { apiKey: hfKey } = await keyRes.json();
+      let hfKey = apiKey.trim() || localStorage.getItem("hf_token") || "";
+      if (!hfKey) {
+        const keyRes = await fetch("/api/active-key", { method: "POST" });
+        const data = await keyRes.json();
+        hfKey = data.apiKey || "";
+      }
 
       if (!hfKey) {
-        setResult({ success: false, error: "يرجى إضافة مفتاح Hugging Face (hf_) في الأسفل أولاً." });
+        setResult({ success: false, error: "يرجى لصق مفتاح Hugging Face (hf_) في الخانة بالأسفل أولاً." });
         setLoading(false);
         return;
       }
@@ -60,7 +66,7 @@ export default function Dashboard() {
         {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${hfKey.trim()}`,
+            Authorization: `Bearer ${hfKey}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({ inputs: prompt }),
@@ -95,7 +101,7 @@ export default function Dashboard() {
           <select value={model} onChange={(e) => setModel(e.target.value)} style={{ padding: "12px", borderRadius: "8px", color: "#000" }}>
             <option value="flux-pro">صورة - Stable Diffusion XL (مجاني)</option>
           </select>
-          <textarea rows={3} placeholder="اكتب وصف الصورة بالإنجليزية لأفضل نتيجة (مثل: a man walking in a sunny park)..." value={prompt} onChange={(e) => setPrompt(e.target.value)} style={{ padding: "12px", borderRadius: "8px", color: "#000" }} />
+          <textarea rows={3} placeholder="اكتب وصف الصورة بالإنجليزية لأفضل نتيجة (مثل: a man walking in a city)..." value={prompt} onChange={(e) => setPrompt(e.target.value)} style={{ padding: "12px", borderRadius: "8px", color: "#000" }} />
           <button type="submit" disabled={loading} style={{ padding: "12px", backgroundColor: "#10b981", color: "#fff", fontWeight: "bold", border: "none", borderRadius: "8px", cursor: "pointer" }}>
             {loading ? "جاري توليد الصورة..." : "توليد الصورة الآن 🚀"}
           </button>
