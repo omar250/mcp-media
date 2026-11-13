@@ -20,15 +20,10 @@ export async function POST(req: Request) {
     });
 
     const firstRow = result.rows.at(0) as any;
-    const apiKey = firstRow?.api_key as string;
+    const apiKey = (firstRow?.api_key as string)?.trim();
     if (!apiKey) {
       return NextResponse.json({ success: false, error: `لا يوجد مفتاح نشط للمزود: ${provider}` }, { status: 404 });
     }
-
-    const headers = {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${apiKey.trim()}`,
-    };
 
     if (provider === "kie") {
       const endpoint = model === "kling-video"
@@ -36,44 +31,46 @@ export async function POST(req: Request) {
         : "https://kie.ai";
 
       const payload = model === "kling-video"
-        ? { model: "kling/v2-1-master-text-to-video", input: { prompt } }
-        : { prompt, aspectRatio: "16:9", model: "flux-kontext-pro" };
+        ? { model: "kling-3.0/video", input: { prompt, aspect_ratio: "16:9", duration: "5" } }
+        : { prompt, aspectRatio: "16:9", model: "flux-kontext-pro", enableTranslation: true };
 
       const res = await fetch(endpoint, {
         method: "POST",
-        headers,
-        redirect: "manual",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${apiKey}`,
+        },
         body: JSON.stringify(payload),
       });
 
-      if (res.status >= 300 && res.status < 400) {
+      const text = await res.text();
+      if (text.trim().startsWith("<")) {
         return NextResponse.json({
           success: false,
-          error: `Kie أعاد توجيهاً (${res.status}) إلى: ${res.headers.get("location")}`,
+          error: "خادم Kie.ai أعاد صفحة ويب؛ تأكد من أن مفتاح Kie.ai المحفوظ في الأسفل صحيح وليس رابطاً.",
         });
       }
-
-      const text = await res.text();
       return NextResponse.json({ success: res.ok, taskId: text, error: res.ok ? null : text });
     } else {
       const res = await fetch("https://cometapi.com", {
         method: "POST",
-        headers,
-        redirect: "manual",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${apiKey}`,
+        },
         body: JSON.stringify({
-          model: "auto",
-          messages: [{ role: "user", content: prompt }],
+          model: "seedream-5.5",
+          prompt,
         }),
       });
 
-      if (res.status >= 300 && res.status < 400) {
+      const text = await res.text();
+      if (text.trim().startsWith("<")) {
         return NextResponse.json({
           success: false,
-          error: `Comet أعاد توجيهاً (${res.status}) إلى: ${res.headers.get("location")}`,
+          error: `CometAPI رد بصفحة HTML (${res.status})؛ تحقق من مسار الموديل أو الرصيد في حسابك.`,
         });
       }
-
-      const text = await res.text();
       return NextResponse.json({ success: res.ok, taskId: text, error: res.ok ? null : text });
     }
   } catch (err: any) {
