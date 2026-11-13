@@ -10,20 +10,20 @@ export async function generateWithComet(
       Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: "flux-schnell",
-      prompt,
+      model: "gpt-4o-mini",
+      messages: [{ role: "user", content: `صِف مشهداً بصرياً قصيراً لـ: ${prompt}` }],
     }),
   });
 
   const text = await res.text();
   if (!res.ok) {
-    throw new Error(`Comet API (${res.status}): ${text.slice(0, 150)}`);
+    throw new Error(`Comet API (${res.status}): ${text.slice(0, 120)}`);
   }
 
   try {
     const data = JSON.parse(text);
-    const url = data.data?.[0]?.url || data.url || data.id;
-    return { taskId: url || "تم الإرسال بنجاح" };
+    const reply = data.choices?.[0]?.message?.content;
+    return { taskId: reply || data.id || "sent-ok" };
   } catch {
     throw new Error(`رد غير متوقع (${res.status}): ${text.slice(0, 100)}`);
   }
