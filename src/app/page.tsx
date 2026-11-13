@@ -30,7 +30,6 @@ export default function Dashboard() {
   const addKey = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!apiKey) return;
-    localStorage.setItem("hf_token", apiKey.trim());
     await fetch("/api/keys", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -38,7 +37,6 @@ export default function Dashboard() {
     });
     setApiKey("");
     loadKeys();
-    alert("✅ تم حفظ المفتاح بنجاح!");
   };
 
   const generateMedia = async (e: React.FormEvent) => {
@@ -48,45 +46,31 @@ export default function Dashboard() {
     setResult(null);
 
     try {
-      let hfKey = apiKey.trim() || localStorage.getItem("hf_token") || "";
-      if (!hfKey) {
-        const keyRes = await fetch("/api/active-key", { method: "POST" });
-        const data = await keyRes.json();
-        hfKey = data.apiKey || "";
-      }
-
-      if (!hfKey) {
-        setResult({ success: false, error: "يرجى لصق مفتاح Hugging Face (hf_) في الخانة بالأسفل أولاً." });
-        setLoading(false);
-        return;
-      }
-
-      const res = await fetch(
-        "https://huggingface.co",
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${hfKey}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ inputs: prompt }),
-        }
-      );
-
-      if (!res.ok) {
-        const errText = await res.text();
-        setResult({ success: false, error: `Hugging Face (${res.status}): ${errText.slice(0, 120)}` });
-        setLoading(false);
-        return;
-      }
-
-      const blob = await res.blob();
-      const imageUrl = URL.createObjectURL(blob);
-      setResult({
-        success: true,
-        message: "✅ تم توليد الصورة بنجاح مجاناً!",
-        imageUrl,
+      const res = await fetch("/mcp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "tools/call",
+          params: { name: "generate_media", arguments: { model, prompt } },
+        }),
       });
+
+      const data = await res.json();
+      const firstContent = Array.isArray(data.result?.content) ? data.result.content.at(0) : null;
+      const textReply = firstContent?.text;
+      const isErr = data.result?.isError || data.error;
+
+      if (isErr) {
+        setResult({ success: false, error: textReply || data.error?.message || "حدث خطأ" });
+      } else {
+        setResult({
+          success: true,
+          message: textReply,
+          imageUrl: data.result?.imageUrl || null,
+        });
+      }
     } catch (err: any) {
       setResult({ success: false, error: err.message });
     }
@@ -99,11 +83,11 @@ export default function Dashboard() {
         <h1 style={{ fontSize: "22px", marginTop: 0, marginBottom: "15px" }}>🎨 استوديو التوليد المجاني</h1>
         <form onSubmit={generateMedia} style={{ display: "grid", gap: "12px" }}>
           <select value={model} onChange={(e) => setModel(e.target.value)} style={{ padding: "12px", borderRadius: "8px", color: "#000" }}>
-            <option value="flux-pro">صورة - Stable Diffusion XL (مجاني)</option>
+            <option value="flux-pro">صورة - Flux AI (مجاني ومباشر)</option>
           </select>
-          <textarea rows={3} placeholder="اكتب وصف الصورة بالإنجليزية لأفضل نتيجة (مثل: a man walking in a city)..." value={prompt} onChange={(e) => setPrompt(e.target.value)} style={{ padding: "12px", borderRadius: "8px", color: "#000" }} />
+          <textarea rows={3} placeholder="اكتب وصف الصورة هنا (يفضل بالإنجليزية لأفضل نتيجة مثل: a man walking in a sunny park)..." value={prompt} onChange={(e) => setPrompt(e.target.value)} style={{ padding: "12px", borderRadius: "8px", color: "#000" }} />
           <button type="submit" disabled={loading} style={{ padding: "12px", backgroundColor: "#10b981", color: "#fff", fontWeight: "bold", border: "none", borderRadius: "8px", cursor: "pointer" }}>
-            {loading ? "جاري توليد الصورة..." : "توليد الصورة الآن 🚀"}
+            {loading ? "جاري توليد الصورة (قد يستغرق 10 ثوانٍ)..." : "توليد الصورة الآن 🚀"}
           </button>
         </form>
 
@@ -132,10 +116,10 @@ export default function Dashboard() {
         <h2 style={{ fontSize: "20px", marginTop: 0, marginBottom: "15px" }}>🔑 إدارة مفاتيح API</h2>
         <form onSubmit={addKey} style={{ display: "flex", gap: "10px", marginBottom: "20px", flexWrap: "wrap" }}>
           <select value={provider} onChange={(e) => setProvider(e.target.value)} style={{ padding: "10px", borderRadius: "8px", color: "#000" }}>
-            <option value="kie">Hugging Face</option>
+            <option value="kie">Kie.ai</option>
             <option value="comet">CometAPI</option>
           </select>
-          <input type="text" placeholder="أدخل مفتاح hf_ هنا" value={apiKey} onChange={(e) => setApiKey(e.target.value)} style={{ flex: 1, padding: "10px", borderRadius: "8px", color: "#000" }} />
+          <input type="text" placeholder="أدخل مفتاح API هنا" value={apiKey} onChange={(e) => setApiKey(e.target.value)} style={{ flex: 1, padding: "10px", borderRadius: "8px", color: "#000" }} />
           <input type="number" value={priority} onChange={(e) => setPriority(Number(e.target.value))} style={{ width: "60px", padding: "10px", borderRadius: "8px", color: "#000" }} />
           <button type="submit" style={{ padding: "10px 20px", backgroundColor: "#3b82f6", color: "#fff", border: "none", borderRadius: "8px", cursor: "pointer" }}>إضافة</button>
         </form>
