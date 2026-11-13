@@ -26,12 +26,12 @@ export async function POST(req: Request) {
           tools: [
             {
               name: "generate_media",
-              description: "توليد صور وفيديوهات عبر Kie.ai أو CometAPI مع التبديل الذكي بين المفاتيح",
+              description: "توليد صور وفيديوهات عبر Kie.ai أو CometAPI",
               inputSchema: {
                 type: "object",
                 properties: {
                   model: { type: "string", enum: ["flux-pro", "kling-video", "luma-dream"] },
-                  prompt: { type: "string", description: "وصف المشهد المطلوب توليده" },
+                  prompt: { type: "string" },
                 },
                 required: ["prompt"],
               },
@@ -42,7 +42,7 @@ export async function POST(req: Request) {
     }
 
     if (method === "tools/call") {
-      const { model = "flux-pro", prompt } = params?.arguments || {};
+      const { model = "kling-video", prompt } = params?.arguments || {};
       const db = createClient({
         url: process.env.TURSO_DATABASE_URL!,
         authToken: process.env.TURSO_AUTH_TOKEN!,
@@ -59,22 +59,70 @@ export async function POST(req: Request) {
         return NextResponse.json({
           jsonrpc,
           id,
-          result: { content: [{ type: "text", text: `خطأ: لا يوجد مفتاح نشط للمزود ${provider}` }], isError: true },
+          result: { content: [{ type: "text", text: `لا يوجد مفتاح نشط للمزود ${provider}` }], isError: true },
         });
       }
 
-      return NextResponse.json({
-        jsonrpc,
-        id,
-        result: {
-          content: [
-            {
-              type: "text",
-              text: `تم استلام طلب التوليد (${model}) بنجاح باستخدام مفتاح ${provider} النشط للوصف: ${prompt}`,
-            },
-          ],
-        },
-      });
+      if (provider === "kie") {
+        const isVideo = model === "kling-video";
+        const endpoint = isVideo
+          ? "https://kie.ai"
+          : "https://kie.ai";
+
+        const payload = isVideo
+          ? { model: "kling/v2-1-master-text-to-video", input: { prompt, aspect_ratio: "16:9", duration: "5" } }
+          : { prompt, aspectRatio: "16:9", model: "flux-kontext-pro" };
+
+        const res = await fetch(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+          body: JSON.stringify(payload),
+        });
+
+        const text = await res.text();
+        if (text.trim().startsWith("<")) {
+          return NextResponse.json({
+            jsonrpc,
+            id,
+            result: { content: [{ type: "text", text: "أعاد Kie.ai صفحة ويب؛ تأكد من شحن رصيد وتفعيل المفتاح." }], isError: true },
+          });
+        }
+
+        const data = JSON.parse(text);
+        const taskId = data.data?.taskId || data.taskId;
+        if (!taskId) {
+          return NextResponse.json({
+            jsonrpc,
+            id,
+            result: { content: [{ type: "text", text: data.msg || text }], isError: true },
+          });
+        }
+
+        return NextResponse.json({
+          jsonrpc,
+          id,
+          result: { taskId, provider, content: [{ type: "text", text: `تم بدء التوليد! رقم المهمة: ${taskId}` }] },
+        });
+      } else {
+        const res = await fetch("https://cometapi.com", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+          body: JSON.stringify({ model: "gpt-4o", messages: [{ role: "user", content: prompt }] }),
+        });
+        const text = await res.text();
+        if (text.trim().startsWith("<")) {
+          return NextResponse.json({
+            jsonrpc,
+            id,
+            result: { content: [{ type: "text", text: "أعاد CometAPI صفحة ويب؛ تأكد من شحن الرصيد وتفعيل المفتاح." }], isError: true },
+          });
+        }
+        return NextResponse.json({
+          jsonrpc,
+          id,
+          result: { content: [{ type: "text", text }] },
+        });
+      }
     }
 
     return NextResponse.json({ jsonrpc, id, error: { code: -32601, message: "Method not found" } });
