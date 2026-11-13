@@ -45,19 +45,52 @@ export default function Dashboard() {
     setLoading(true);
     setResult(null);
     try {
-      const res = await fetch("/mcp", {
+      const targetProvider = model === "luma-dream" ? "comet" : "kie";
+      const keyRes = await fetch("/api/active-key", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ model, prompt }),
+        body: JSON.stringify({ provider: targetProvider }),
       });
-      const text = await res.text();
-      try {
-        setResult(JSON.parse(text));
-      } catch {
-        setResult({
-          success: false,
-          error: `استجابة الخادم (${res.status}): ${text.slice(0, 120)}`,
+      const { apiKey: activeKey } = await keyRes.json();
+
+      if (!activeKey) {
+        setResult({ success: false, error: `لا يوجد مفتاح نشط للمزود: ${targetProvider}` });
+        setLoading(false);
+        return;
+      }
+
+      if (targetProvider === "kie") {
+        const endpoint = model === "kling-video"
+          ? "https://kie.ai"
+          : "https://kie.ai";
+        const payload = model === "kling-video"
+          ? { model: "kling-3.0/video", input: { prompt, aspect_ratio: "16:9", duration: "5" } }
+          : { prompt, aspectRatio: "16:9", model: "flux-kontext-pro" };
+
+        const res = await fetch(endpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${activeKey.trim()}`,
+          },
+          body: JSON.stringify(payload),
         });
+        const text = await res.text();
+        setResult({ success: res.ok, taskId: text, error: res.ok ? null : text });
+      } else {
+        const res = await fetch("https://cometapi.com", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${activeKey.trim()}`,
+          },
+          body: JSON.stringify({
+            model: "gpt-4o",
+            messages: [{ role: "user", content: prompt }],
+          }),
+        });
+        const text = await res.text();
+        setResult({ success: res.ok, taskId: text, error: res.ok ? null : text });
       }
     } catch (err: any) {
       setResult({ success: false, error: err.message });
