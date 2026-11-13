@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { createClient } from "@libsql/client";
 
 export async function POST(req: Request) {
   try {
@@ -7,6 +7,11 @@ export async function POST(req: Request) {
     if (!prompt) {
       return NextResponse.json({ success: false, error: "يرجى كتابة الوصف أولاً" }, { status: 400 });
     }
+
+    const db = createClient({
+      url: process.env.TURSO_DATABASE_URL!,
+      authToken: process.env.TURSO_AUTH_TOKEN!,
+    });
 
     const provider = model === "luma-dream" ? "comet" : "kie";
     const result = await db.execute({
