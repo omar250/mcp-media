@@ -25,8 +25,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: `لا يوجد مفتاح نشط للمزود: ${provider}` }, { status: 404 });
     }
 
+    const headers = {
+      "Content-Type": "application/json",
+      "Accept": "application/json",
+      "User-Agent": "Mozilla/5.0 (compatible; MCPMediaClient/1.0)",
+      "Authorization": `Bearer ${apiKey.trim()}`,
+    };
+
     if (provider === "kie") {
-      // مسار Flux الرسمي في Kie.ai أو مسار المهام العام
       const endpoint = model === "kling-video"
         ? "https://kie.ai"
         : "https://kie.ai";
@@ -37,27 +43,22 @@ export async function POST(req: Request) {
 
       const res = await fetch(endpoint, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Accept": "application/json",
-          "Authorization": `Bearer ${apiKey}`,
-        },
+        headers,
         body: JSON.stringify(payload),
       });
 
       const text = await res.text();
       if (text.trim().startsWith("<")) {
-        return NextResponse.json({ success: false, error: "خادم Kie.ai أعاد صفحة ويب؛ تأكد من صحة رابط API في حسابك." });
+        return NextResponse.json({
+          success: false,
+          error: `Kie رد بصفحة ويب | الحالة: ${res.status} | الرابط: ${res.url}`,
+        });
       }
       return NextResponse.json({ success: res.ok, taskId: text, error: res.ok ? null : text });
     } else {
       const res = await fetch("https://cometapi.com", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Accept": "application/json",
-          "Authorization": `Bearer ${apiKey}`,
-        },
+        headers,
         body: JSON.stringify({
           model: "gpt-4o-mini",
           messages: [{ role: "user", content: prompt }],
@@ -66,7 +67,10 @@ export async function POST(req: Request) {
 
       const text = await res.text();
       if (text.trim().startsWith("<")) {
-        return NextResponse.json({ success: false, error: "خادم CometAPI أعاد صفحة ويب؛ تأكد من تفعيل المفتاح والرصيد في حسابك." });
+        return NextResponse.json({
+          success: false,
+          error: `Comet رد بصفحة ويب | الحالة: ${res.status} | الرابط: ${res.url}`,
+        });
       }
       return NextResponse.json({ success: res.ok, taskId: text, error: res.ok ? null : text });
     }
