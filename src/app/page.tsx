@@ -9,6 +9,7 @@ export default function Dashboard() {
 
   const [model, setModel] = useState("flux");
   const [prompt, setPrompt] = useState("");
+  const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
 
   const loadKeys = async () => {
@@ -38,16 +39,29 @@ export default function Dashboard() {
     loadKeys();
   };
 
-  const generateMedia = (e: React.FormEvent) => {
+  const generateMedia = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!prompt.trim()) return;
-    const cleanPrompt = encodeURIComponent(prompt.trim());
-    const imageUrl = `https://pollinations.ai{cleanPrompt}?model=${model}&width=1024&height=576&nologo=true&seed=${Date.now()}`;
+    setLoading(true);
+
+    let finalPrompt = prompt.trim();
+    try {
+      const tr = await fetch(
+        `https://translated.net{encodeURIComponent(finalPrompt)}&langpair=ar|en`
+      );
+      const trData = await tr.json();
+      if (trData?.responseData?.translatedText) {
+        finalPrompt = trData.responseData.translatedText;
+      }
+    } catch {}
+
+    const imageUrl = `https://pollinations.ai{encodeURIComponent(finalPrompt)}?model=${model}&width=1024&height=576&nologo=true&seed=${Date.now()}`;
     setResult({
       success: true,
-      message: "✅ جاري رسم وعرض الصورة مباشرة (انتظر ثواني قليلة)...",
+      message: `✅ جاري رسم الصورة (${finalPrompt})...`,
       imageUrl,
     });
+    setLoading(false);
   };
 
   return (
@@ -59,9 +73,9 @@ export default function Dashboard() {
             <option value="flux">صورة - Flux AI (مجاني ومباشر)</option>
             <option value="turbo">صورة - Turbo سريع (مجاني)</option>
           </select>
-          <textarea rows={3} placeholder="اكتب وصف الصورة بالإنجليزية لأفضل نتيجة (مثل: a man walking in a sunny park)..." value={prompt} onChange={(e) => setPrompt(e.target.value)} style={{ padding: "12px", borderRadius: "8px", color: "#000" }} />
-          <button type="submit" style={{ padding: "12px", backgroundColor: "#10b981", color: "#fff", fontWeight: "bold", border: "none", borderRadius: "8px", cursor: "pointer" }}>
-            توليد الصورة الآن 🚀
+          <textarea rows={3} placeholder="اكتب وصف الصورة بالعربية أو الإنجليزية هنا..." value={prompt} onChange={(e) => setPrompt(e.target.value)} style={{ padding: "12px", borderRadius: "8px", color: "#000" }} />
+          <button type="submit" disabled={loading} style={{ padding: "12px", backgroundColor: "#10b981", color: "#fff", fontWeight: "bold", border: "none", borderRadius: "8px", cursor: "pointer" }}>
+            {loading ? "جاري الترجمة والإرسال..." : "توليد الصورة الآن 🚀"}
           </button>
         </form>
 
