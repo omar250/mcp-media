@@ -7,9 +7,8 @@ export default function Dashboard() {
   const [apiKey, setApiKey] = useState("");
   const [priority, setPriority] = useState(0);
 
-  const [model, setModel] = useState("flux-pro");
+  const [model, setModel] = useState("flux");
   const [prompt, setPrompt] = useState("");
-  const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
 
   const loadKeys = async () => {
@@ -39,42 +38,16 @@ export default function Dashboard() {
     loadKeys();
   };
 
-  const generateMedia = async (e: React.FormEvent) => {
+  const generateMedia = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!prompt) return;
-    setLoading(true);
-    setResult(null);
-
-    try {
-      const res = await fetch("/mcp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          jsonrpc: "2.0",
-          id: 1,
-          method: "tools/call",
-          params: { name: "generate_media", arguments: { model, prompt } },
-        }),
-      });
-
-      const data = await res.json();
-      const firstContent = Array.isArray(data.result?.content) ? data.result.content.at(0) : null;
-      const textReply = firstContent?.text;
-      const isErr = data.result?.isError || data.error;
-
-      if (isErr) {
-        setResult({ success: false, error: textReply || data.error?.message || "حدث خطأ" });
-      } else {
-        setResult({
-          success: true,
-          message: textReply,
-          imageUrl: data.result?.imageUrl || null,
-        });
-      }
-    } catch (err: any) {
-      setResult({ success: false, error: err.message });
-    }
-    setLoading(false);
+    if (!prompt.trim()) return;
+    const cleanPrompt = encodeURIComponent(prompt.trim());
+    const imageUrl = `https://pollinations.ai{cleanPrompt}?model=${model}&width=1024&height=576&nologo=true&seed=${Date.now()}`;
+    setResult({
+      success: true,
+      message: "✅ جاري رسم وعرض الصورة مباشرة (انتظر ثواني قليلة)...",
+      imageUrl,
+    });
   };
 
   return (
@@ -83,31 +56,26 @@ export default function Dashboard() {
         <h1 style={{ fontSize: "22px", marginTop: 0, marginBottom: "15px" }}>🎨 استوديو التوليد المجاني</h1>
         <form onSubmit={generateMedia} style={{ display: "grid", gap: "12px" }}>
           <select value={model} onChange={(e) => setModel(e.target.value)} style={{ padding: "12px", borderRadius: "8px", color: "#000" }}>
-            <option value="flux-pro">صورة - Flux AI (مجاني ومباشر)</option>
+            <option value="flux">صورة - Flux AI (مجاني ومباشر)</option>
+            <option value="turbo">صورة - Turbo سريع (مجاني)</option>
           </select>
-          <textarea rows={3} placeholder="اكتب وصف الصورة هنا (يفضل بالإنجليزية لأفضل نتيجة مثل: a man walking in a sunny park)..." value={prompt} onChange={(e) => setPrompt(e.target.value)} style={{ padding: "12px", borderRadius: "8px", color: "#000" }} />
-          <button type="submit" disabled={loading} style={{ padding: "12px", backgroundColor: "#10b981", color: "#fff", fontWeight: "bold", border: "none", borderRadius: "8px", cursor: "pointer" }}>
-            {loading ? "جاري توليد الصورة (قد يستغرق 10 ثوانٍ)..." : "توليد الصورة الآن 🚀"}
+          <textarea rows={3} placeholder="اكتب وصف الصورة بالإنجليزية لأفضل نتيجة (مثل: a man walking in a sunny park)..." value={prompt} onChange={(e) => setPrompt(e.target.value)} style={{ padding: "12px", borderRadius: "8px", color: "#000" }} />
+          <button type="submit" style={{ padding: "12px", backgroundColor: "#10b981", color: "#fff", fontWeight: "bold", border: "none", borderRadius: "8px", cursor: "pointer" }}>
+            توليد الصورة الآن 🚀
           </button>
         </form>
 
         {result && (
           <div style={{ marginTop: "15px", padding: "12px", backgroundColor: "#0f172a", borderRadius: "8px", fontSize: "14px", wordBreak: "break-all" }}>
-            {result.success ? (
-              <div style={{ display: "grid", gap: "10px" }}>
-                <p style={{ margin: 0, color: "#4ade80" }}>{result.message}</p>
-                {result.imageUrl && (
-                  <div>
-                    <img src={result.imageUrl} alt={prompt} style={{ width: "100%", borderRadius: "8px" }} />
-                    <a href={result.imageUrl} download="ai-image.jpg" style={{ display: "block", marginTop: "10px", padding: "10px", backgroundColor: "#3b82f6", color: "#fff", textAlign: "center", borderRadius: "8px", textDecoration: "none", fontWeight: "bold" }}>
-                      ⬇️ حفظ الصورة على الهاتف
-                    </a>
-                  </div>
-                )}
-              </div>
-            ) : (
-              `❌ خطأ: ${result.error}`
-            )}
+            <p style={{ margin: "0 0 10px 0", color: "#4ade80" }}>{result.message}</p>
+            <img
+              src={result.imageUrl}
+              alt={prompt}
+              style={{ width: "100%", borderRadius: "8px", minHeight: "200px", backgroundColor: "#1e293b" }}
+            />
+            <a href={result.imageUrl} target="_blank" rel="noreferrer" style={{ display: "block", marginTop: "10px", padding: "10px", backgroundColor: "#3b82f6", color: "#fff", textAlign: "center", borderRadius: "8px", textDecoration: "none", fontWeight: "bold" }}>
+              ⬇️ فتح وحفظ الصورة كاملة
+            </a>
           </div>
         )}
       </section>
