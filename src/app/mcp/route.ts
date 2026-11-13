@@ -39,6 +39,7 @@ export async function POST(req: Request) {
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${apiKey}`,
+          "User-Agent": "OpenAI/JS 4.0.0",
         },
         body: JSON.stringify(payload),
       });
@@ -47,7 +48,7 @@ export async function POST(req: Request) {
       if (text.trim().startsWith("<")) {
         return NextResponse.json({
           success: false,
-          error: "خادم Kie.ai أعاد صفحة ويب؛ تأكد من أن مفتاح Kie.ai المحفوظ في الأسفل صحيح وليس رابطاً.",
+          error: "خادم Kie.ai أعاد صفحة ويب؛ تأكد من إضافة مفتاح Kie.ai الصحيح بأولوية 0 في الأسفل.",
         });
       }
       return NextResponse.json({ success: res.ok, taskId: text, error: res.ok ? null : text });
@@ -57,10 +58,11 @@ export async function POST(req: Request) {
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${apiKey}`,
+          "User-Agent": "OpenAI/JS 4.0.0",
         },
         body: JSON.stringify({
-          model: "seedream-5.5",
-          prompt,
+          model: "gpt-4o",
+          messages: [{ role: "user", content: prompt }],
         }),
       });
 
@@ -68,7 +70,7 @@ export async function POST(req: Request) {
       if (text.trim().startsWith("<")) {
         return NextResponse.json({
           success: false,
-          error: `CometAPI رد بصفحة HTML (${res.status})؛ تحقق من مسار الموديل أو الرصيد في حسابك.`,
+          error: `CometAPI ما زال يوجه للموقع الرئيسي (${res.status})؛ تأكد من تفعيل الرصيد أو إنشاء مفتاح جديد في CometAPI.`,
         });
       }
       return NextResponse.json({ success: res.ok, taskId: text, error: res.ok ? null : text });
