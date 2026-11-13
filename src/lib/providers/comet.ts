@@ -14,9 +14,13 @@ export async function generateWithComet(
 
   const text = await res.text();
   if (!res.ok) {
-    throw new Error(`Comet API error (${res.status}): ${text.slice(0, 120)}`);
+    throw new Error(`Comet API (${res.status}): ${text.slice(0, 100)}`);
   }
 
-  const data = text ? JSON.parse(text) : {};
-  return { taskId: data.data?.taskId || data.task_id || data.id || "sent-ok" };
+  try {
+    const data = JSON.parse(text);
+    return { taskId: data.data?.[0]?.url || data.taskId || data.id || "sent-ok" };
+  } catch {
+    throw new Error("أعاد خادم CometAPI صفحة HTML بدلاً من JSON؛ تحقق من رابط API الخاص به.");
+  }
 }
