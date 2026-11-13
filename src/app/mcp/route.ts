@@ -27,8 +27,6 @@ export async function POST(req: Request) {
 
     const headers = {
       "Content-Type": "application/json",
-      "Accept": "application/json",
-      "User-Agent": "Mozilla/5.0 (compatible; MCPMediaClient/1.0)",
       "Authorization": `Bearer ${apiKey.trim()}`,
     };
 
@@ -44,34 +42,38 @@ export async function POST(req: Request) {
       const res = await fetch(endpoint, {
         method: "POST",
         headers,
+        redirect: "manual",
         body: JSON.stringify(payload),
       });
 
-      const text = await res.text();
-      if (text.trim().startsWith("<")) {
+      if (res.status >= 300 && res.status < 400) {
         return NextResponse.json({
           success: false,
-          error: `Kie رد بصفحة ويب | الحالة: ${res.status} | الرابط: ${res.url}`,
+          error: `Kie أعاد توجيهاً (${res.status}) إلى: ${res.headers.get("location")}`,
         });
       }
+
+      const text = await res.text();
       return NextResponse.json({ success: res.ok, taskId: text, error: res.ok ? null : text });
     } else {
       const res = await fetch("https://cometapi.com", {
         method: "POST",
         headers,
+        redirect: "manual",
         body: JSON.stringify({
-          model: "gpt-4o-mini",
+          model: "auto",
           messages: [{ role: "user", content: prompt }],
         }),
       });
 
-      const text = await res.text();
-      if (text.trim().startsWith("<")) {
+      if (res.status >= 300 && res.status < 400) {
         return NextResponse.json({
           success: false,
-          error: `Comet رد بصفحة ويب | الحالة: ${res.status} | الرابط: ${res.url}`,
+          error: `Comet أعاد توجيهاً (${res.status}) إلى: ${res.headers.get("location")}`,
         });
       }
+
+      const text = await res.text();
       return NextResponse.json({ success: res.ok, taskId: text, error: res.ok ? null : text });
     }
   } catch (err: any) {
